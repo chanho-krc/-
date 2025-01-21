@@ -37,11 +37,18 @@ async function submitQuestion() {
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         };
 
-        await db.collection('questions').add(questionData);
+        // 콘솔에 데이터 출력하여 확인
+        console.log('Submitting question:', questionData);
+
+        // Firestore에 데이터 추가
+        const docRef = await db.collection('questions').add(questionData);
+        console.log('Document written with ID: ', docRef.id);
+
         clearForm();
+        alert('질문이 성공적으로 등록되었습니다!');
     } catch (error) {
         console.error("Error adding question:", error);
-        alert('질문 등록에 실패했습니다.');
+        alert('질문 등록에 실패했습니다: ' + error.message);
     }
 }
 
@@ -67,9 +74,10 @@ async function submitAnswer(questionId) {
         });
 
         answerInput.value = '';
+        alert('답변이 등록되었습니다!');
     } catch (error) {
         console.error("Error adding answer:", error);
-        alert('답변 등록에 실패했습니다.');
+        alert('답변 등록에 실패했습니다: ' + error.message);
     }
 }
 
@@ -89,13 +97,13 @@ function updateQuestionsList() {
             <h3>${question.title}</h3>
             <p>${question.content}</p>
             <div class="answers">
-                <h4>💬 답변 (${question.answers.length}개)</h4>
-                ${question.answers.map(answer => `
+                <h4>💬 답변 (${question.answers ? question.answers.length : 0}개)</h4>
+                ${question.answers ? question.answers.map(answer => `
                     <div class="answer">
                         <p>${answer.content}</p>
                         <small>📅 ${answer.date}</small>
                     </div>
-                `).join('')}
+                `).join('') : ''}
                 <div class="answer-form">
                     <input type="text" id="answer-${question.id}" 
                            class="answer-input" 
