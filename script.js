@@ -1,8 +1,23 @@
+// Firebase 초기화
+const firebaseConfig = {
+    apiKey: "AIzaSyBZDQCt9JsiTWPIfupuTx-soL4P8queAbE",
+    authDomain: "qna1-27186.firebaseapp.com",
+    projectId: "qna1-27186",
+    storageBucket: "qna1-27186.firebasestorage.app",
+    messagingSenderId: "406324964352",
+    appId: "1:406324964352:web:893b762650b83e452e3ce5",
+    measurementId: "G-WTL0ZKVBXC"
+};
+
+// Firebase 초기화
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 // 질문 데이터를 저장할 배열
-let questions = JSON.parse(localStorage.getItem('questions')) || [];
+let questions = [];
 
 // 질문 제출 함수
-function submitQuestion() {
+async function submitQuestion() {
     const subject = document.getElementById('subject').value;
     const title = document.getElementById('title').value;
     const content = document.getElementById('content').value;
@@ -12,23 +27,26 @@ function submitQuestion() {
         return;
     }
 
-    const question = {
-        id: Date.now(),
-        subject: subject,
-        title: title,
-        content: content,
-        answers: [],
-        date: new Date().toLocaleDateString()
-    };
+    try {
+        const questionData = {
+            subject: subject,
+            title: title,
+            content: content,
+            answers: [],
+            date: new Date().toLocaleDateString(),
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        };
 
-    questions.unshift(question);
-    saveToLocalStorage();
-    updateQuestionsList();
-    clearForm();
+        await db.collection('questions').add(questionData);
+        clearForm();
+    } catch (error) {
+        console.error("Error adding question:", error);
+        alert('질문 등록에 실패했습니다.');
+    }
 }
 
 // 답변 제출 함수
-function submitAnswer(questionId) {
+async function submitAnswer(questionId) {
     const answerInput = document.getElementById(`answer-${questionId}`);
     const answerText = answerInput.value;
 
@@ -37,21 +55,22 @@ function submitAnswer(questionId) {
         return;
     }
 
-    const question = questions.find(q => q.id === questionId);
-    if (question) {
-        question.answers.push({
-            content: answerText,
-            date: new Date().toLocaleDateString()
+    try {
+        const questionRef = db.collection('questions').doc(questionId);
+        
+        await questionRef.update({
+            answers: firebase.firestore.FieldValue.arrayUnion({
+                content: answerText,
+                date: new Date().toLocaleDateString(),
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            })
         });
-        saveToLocalStorage();
-        updateQuestionsList();
-    }
-    answerInput.value = '';
-}
 
-// localStorage에 데이터 저장하는 함수
-function saveToLocalStorage() {
-    localStorage.setItem('questions', JSON.stringify(questions));
+        answerInput.value = '';
+    } catch (error) {
+        console.error("Error adding answer:", error);
+        alert('답변 등록에 실패했습니다.');
+    }
 }
 
 // 질문 목록 업데이트 함수
@@ -81,7 +100,7 @@ function updateQuestionsList() {
                     <input type="text" id="answer-${question.id}" 
                            class="answer-input" 
                            placeholder="답변을 입력하세요">
-                    <button onclick="submitAnswer(${question.id})" 
+                    <button onclick="submitAnswer('${question.id}')" 
                             class="submit-btn">답변 등록</button>
                 </div>
             </div>
@@ -108,5 +127,22 @@ function clearForm() {
     document.getElementById('content').value = '';
 }
 
-// 초기 질문 목록 렌더링
-updateQuestionsList();
+// 실시간 업데이트 설정
+function setupRealtimeUpdates() {
+    db.collection('questions')
+        .orderBy('timestamp', 'desc')
+        .onSnapshot((snapshot) => {
+            questions = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            updateQuestionsList();
+        }, (error) => {
+            console.error("Realtime update error:", error);
+        });
+}
+
+// 페이지 로드 시 실행
+document.addEventListener('DOMContentLoaded', () => {
+    setupRealtimeUpdates();
+});
